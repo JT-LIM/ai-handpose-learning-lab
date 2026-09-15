@@ -9,6 +9,7 @@ const fresh = () => features && performance.now() - lastSeen < 500;
 const ready = () => lesson.model.length > 0 && !lesson.dirty;
 function endCollection() {
   collecting = null;
+  renderGuidance();
   document.querySelectorAll('.collect').forEach(b => b.classList.remove('collecting'));
 }
 function refresh() {
@@ -16,16 +17,17 @@ function refresh() {
   $('total').textContent = `${lesson.samples.length}개 수집`;
   $('train').disabled = !Object.keys(names).every(label => lesson.count(label) >= 3) || !lesson.dirty;
   $('tab-test').disabled = !ready();
-  $('tab-robot').disabled = !ready() || !lesson.tests.some(t => t.version === lesson.version);
+  $('tab-robot').disabled = !lesson.canDrive();
+  $('go-robot').disabled = !lesson.canDrive();
   $('record').disabled = !ready() || !fresh();
-  $('robot-start').disabled = !ready() || !characteristic || driving || stopping;
+  $('robot-start').disabled = !lesson.canDrive() || !characteristic || driving || stopping;
   $('connect').disabled = !!device || !navigator.bluetooth;
   $('disconnect').disabled = !device;
   $('model-status').textContent = lesson.version ? `모델 ${lesson.version} · ${lesson.model.length}개로 학습${lesson.dirty ? ' · 데이터 변경됨, 다시 학습해주세요.' : ' 완료'}` : '아직 학습한 모델이 없어요.';
 }
 async function changeStage(next) {
   if (next !== 'learn' && !ready()) return;
-  if (next === 'robot' && !lesson.tests.some(t => t.version === lesson.version)) return;
+  if (next === 'robot' && !lesson.canDrive()) return;
   endCollection();
   await stopRobot();
   stage = next;
@@ -35,7 +37,7 @@ async function changeStage(next) {
     else $('tab-' + name).removeAttribute('aria-current');
   });
   notify({ learn: '손 모양은 입력 데이터, 버튼의 이름은 정답이에요.', test: '테스트 데이터는 학습에 사용하지 않아요. 친구의 손이나 새로운 각도로 시험해보세요.', robot: '기기를 연결한 뒤 조작 시작을 눌러주세요.' }[stage]);
-  refresh();
+  refresh(); renderGuidance();
 }
 for (const label in names) {
   const card = document.createElement('div'); card.className = 'gesture-card';
@@ -50,9 +52,9 @@ for (const label in names) {
   ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(event => button.addEventListener(event, endCollection));
   // 키보드는 한 번 누를 때마다 한 샘플을 저장합니다.
   button.addEventListener('click', e => {
-    if (e.detail === 0 && stage === 'learn' && fresh()) { lesson.add(label, features); refresh(); }
+    if (e.detail === 0 && stage === 'learn' && fresh()) { lesson.add(label, features); refresh(); renderGuidance(); }
   });
-  card.querySelector('.delete').onclick = () => { endCollection(); lesson.remove(label); refresh(); notify('수집 데이터를 삭제했어요. 다시 학습하면 모델에 반영돼요.'); };
+  card.querySelector('.delete').onclick = () => { endCollection(); lesson.remove(label); refresh(); renderGuidance(); notify('수집 데이터를 삭제했어요. 다시 학습하면 모델에 반영돼요.'); };
   const option = document.createElement('option'); option.value = label; option.textContent = names[label]; $('expected').append(option);
 }
 ['learn', 'test', 'robot'].forEach(name => { $('tab-' + name).onclick = () => changeStage(name); });
@@ -61,13 +63,39 @@ $('train').onclick = () => {
   try { lesson.train(); renderTests(); refresh(); changeStage('test'); }
   catch (error) { notify(error.message); }
 };
+$('go-robot').onclick = () => changeStage('robot');
 $('improve').onclick = () => changeStage('learn');
 $('reset').onclick = async () => {
   if (!confirm('수집 데이터, 모델, 시험 기록을 모두 지울까요?')) return;
   await changeStage('learn');
   Object.assign(lesson, new window.LessonModel()); renderTests(); refresh(); notify('초기화했어요. 새로운 손 모양을 모아보세요.');
 };
+function renderGuidance() {
+  const notes = lesson.feedback(stage !== 'learn');
+  const list = $('feedback-list'); list.replaceChildren();
+  for (const note of notes) {
+    const item = document.createElement('li');
+    if (note.type === 'few') item.textContent = `예시가 적은 동작: ${note.labels.map(label => `${names[label]} ${note.counts[label]}개`).join(', ')}. 손 각도를 바꾸거나 다른 친구의 손으로 예시를 더 모아보세요. 10개 미만은 수업용 참고 기준이며, 개수만으로 성능을 판단할 수 없어요.`;
+    if (note.type === 'imbalance') item.textContent = `동작별 데이터 차이가 커요 (${Object.entries(note.counts).map(([label,count]) => `${names[label]} ${count}개`).join(', ')}). 한 동작의 예시에 치우칠 수 있으니 적은 동작도 더 모아보세요.`;
+    if (note.type === 'testing') item.textContent = `아직 모든 동작을 충분히 확인하지 않았어요. 동작별 2회 조건을 채우려면 ${note.remaining}회 더 시험해야 해요. 테스트를 늘려도 모델이 학습되는 것은 아니에요.`;
+    if (note.type === 'confusion') item.textContent = `실제 ${names[note.expected]}를 AI가 ${names[note.predicted]}로 ${note.count}회 예상했어요. 두 손 모양이 비슷하거나 예시·정답이 충분하지 않을 수 있어요. 정답 이름을 확인하고, 서로 구분되는 다양한 예시를 모아 다시 학습해보세요.`;
+    list.append(item);
+  }
+  if (!notes.length) { const item = document.createElement('li'); item.textContent = '현재 횟수와 오답 기록에서 뚜렷한 점검 항목은 없어요. 모든 손을 잘 알아본다는 뜻은 아니니 새로운 친구의 손도 시험해보세요.'; list.append(item); }
+  $('feedback-source').textContent = stage === 'learn' ? '수집 중인 데이터와 현재 모델의 시험 기록 기준' : `모델 ${lesson.version}에 사용한 데이터와 시험 기록 기준`;
+}
 function renderTests() {
+  const progress = lesson.testProgress();
+  $('test-progress').textContent = `마퀸 조작 준비 ${progress.completed}/10 · 실제 시험 ${progress.total}회`;
+  $('test-counts').replaceChildren();
+  for (const label in names) {
+    const item = document.createElement('span');
+    item.className = progress.counts[label] >= 2 ? 'pill' : 'pill pending';
+    item.textContent = `${names[label]} ${progress.counts[label]}/2회`;
+    $('test-counts').append(item);
+  }
+  $('unlock-status').textContent = lesson.canDrive() ? '다섯 동작을 모두 2번 이상 시험했어요. 정답률과 관계없이 마퀸 조작을 시작할 수 있어요.' : '실제 정답으로 선택한 동작별로 2회씩 시험해주세요. 한 동작만 여러 번 시험해도 열리지 않아요. 다시 학습하면 새 모델에서 10회 조건을 다시 확인해요.';
+  renderGuidance();
   const current = lesson.tests.filter(t => t.version === lesson.version);
   const correct = current.filter(t => t.correct).length;
   $('accuracy').textContent = current.length ? `${Math.round(correct / current.length * 100)}%` : '—';
@@ -195,7 +223,7 @@ $('connect').onclick = async () => {
 };
 $('disconnect').onclick = async () => { await stopRobot(); device?.gatt.disconnect(); };
 $('robot-start').onclick = () => {
-  if (stage !== 'robot' || !ready() || !characteristic || stopping) return;
+  if (stage !== 'robot' || !lesson.canDrive() || !characteristic || stopping) return;
   if (!fresh()) { notify('손이 보이는 상태에서 시작해주세요.'); return; }
   driving = true; $('robot-status').textContent = '마퀸 조작 중 · 손을 보여주세요.'; refresh();
 };

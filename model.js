@@ -13,6 +13,33 @@
       this.model = this.samples.map(s => ({ label: s.label, features: [...s.features] }));
       this.version++; this.dirty = false;
     }
+    testProgress() {
+      const current = this.tests.filter(t => t.version === this.version);
+      const counts = Object.fromEntries(labels.map(label => [label, current.filter(t => t.expected === label).length]));
+      return { counts, completed: labels.reduce((sum, label) => sum + Math.min(2, counts[label]), 0), total: current.length };
+    }
+    canDrive() {
+      return this.model.length > 0 && !this.dirty && this.testProgress().completed === 10;
+    }
+    feedback(useModel = false) {
+      const source = useModel ? this.model : this.samples;
+      const counts = Object.fromEntries(labels.map(label => [label, source.filter(s => s.label === label).length]));
+      const notes = [];
+      const few = labels.filter(label => counts[label] < 10);
+      if (few.length) notes.push({ type: 'few', labels: few, counts });
+      const min = Math.min(...Object.values(counts)), max = Math.max(...Object.values(counts));
+      if (max > 0 && (min === 0 || max >= min * 3)) notes.push({ type: 'imbalance', counts });
+      const progress = this.testProgress();
+      if (progress.completed < 10) notes.push({ type: 'testing', remaining: 10 - progress.completed });
+      const pairs = new Map();
+      for (const t of this.tests.filter(t => t.version === this.version && !t.correct)) {
+        const key = t.expected + ':' + t.predicted;
+        const pair = pairs.get(key) || { type: 'confusion', expected: t.expected, predicted: t.predicted, count: 0 };
+        pair.count++; pairs.set(key, pair);
+      }
+      notes.push(...[...pairs.values()].filter(pair => pair.count >= 2).sort((a,b) => b.count - a.count));
+      return notes;
+    }
     predict(features) {
       if (!this.model.length) return null;
       const neighbors = this.model.map(s => ({ label: s.label, distance: s.features.reduce((sum, x, i) => sum + (x - features[i]) ** 2, 0) }))
@@ -24,6 +51,7 @@
     }
     record(expected, features) {
       if (this.dirty || !this.model.length) throw Error('먼저 현재 데이터로 학습해주세요.');
+      if (!labels.includes(expected)) throw Error('실제 정답을 선택해주세요.');
       const prediction = this.predict(features);
       const test = { version: this.version, expected, predicted: prediction.label, correct: expected === prediction.label };
       this.tests.push(test); return test;

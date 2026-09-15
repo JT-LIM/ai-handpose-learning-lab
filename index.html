@@ -8,6 +8,7 @@
 </head>
 <body>
 <header><div class="brand"><img src="favicon.svg" alt="덕소중학교"><span>덕소중학교 · AI 실험실</span></div><span class="tag">지도학습</span></header>
+<div class="guide-link"><a href="teacher-guide.html">교사용 수업 진행안 ↗</a></div>
 <section class="intro"><p class="eyebrow">내가 가르치고, AI가 맞히고</p><h1>머신러닝의 이해</h1><p>핸드포즈로 마퀸 조작하기 <span>· 학습과 테스트</span></p></section>
 <main>
   <aside class="camera-card">
@@ -32,10 +33,12 @@
     <section id="panel-test" class="panel" hidden>
       <div class="section-title"><div><p class="eyebrow">STEP 02</p><h2>처음 보는 손으로 시험하기</h2></div><span class="pill">학습 데이터에 추가 안 됨</span></div>
       <p class="description">친구에게 손을 보여달라고 해보세요. <b>실제 정답</b>을 선택한 다음 시험 기록을 남겨요. 테스트 중에는 로봇이 움직이지 않아요.</p>
+      <div class="test-checklist"><h3 id="test-progress"></h3><div id="test-counts"></div><p id="unlock-status"></p><p class="footnote">같은 손을 연속 클릭하기보다 손을 내렸다가 각도·사람을 바꿔 한 번씩 시험해요.</p></div>
       <label for="expected">이번 손 모양의 실제 정답</label><select id="expected"></select>
       <button id="record" class="primary">현재 손으로 1회 시험하기</button>
       <div class="score"><div><span>현재 모델 정답률</span><strong id="accuracy">—</strong></div><p id="score-detail">아직 시험 기록이 없어요.</p></div>
       <div class="table-wrap"><table><caption>시험 기록 · 최근 10회</caption><thead><tr><th>모델</th><th>실제 정답</th><th>AI 예상</th><th>결과</th></tr></thead><tbody id="test-results"></tbody></table></div>
+      <button id="go-robot" class="primary" disabled>마퀸 조작으로 이동</button>
       <button id="improve" class="secondary">데이터 보완하고 다시 학습하기</button>
       <div id="history" class="footnote"></div>
     </section>
@@ -47,6 +50,11 @@
       <div class="actions"><button id="robot-start" class="primary" disabled>마퀸 조작 시작</button><button id="robot-stop" class="danger">정지</button></div>
       <p id="robot-status" role="status">조작 시작을 누르기 전에는 명령을 보내지 않아요.</p>
       <p class="footnote">학습·테스트로 돌아가거나 손이 보이지 않으면 정지 명령을 보냅니다. 블루투스 연결은 유지하며 다시 학습할 수 있어요.</p>
+    </section>
+    <section class="feedback-card" aria-label="데이터와 오답 살펴보기">
+      <h2>왜 잘 안 될까요?</h2><p id="feedback-source" class="footnote"></p>
+      <ul id="feedback-list"></ul>
+      <p class="footnote">횟수와 오답 기록을 보고 제안하는 가능한 이유예요. 원인을 확정하거나 일부러 틀리게 만들지 않아요. 같은 데이터로 학습 버튼만 다시 눌러도 더 똑똑해지지 않아요.</p>
     </section>
   </section>
 </main>
