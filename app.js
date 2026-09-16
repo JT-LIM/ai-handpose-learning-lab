@@ -143,6 +143,22 @@ $('camera-start').onclick = async () => {
     console.error(error);
   }
 };
+function drawHand(hand) {
+  const connections = [
+    [0,1],[1,2],[2,3],[3,4], [0,5],[5,6],[6,7],[7,8],
+    [0,9],[9,10],[10,11],[11,12], [0,13],[13,14],[14,15],[15,16],
+    [0,17],[17,18],[18,19],[19,20], [5,9],[9,13],[13,17]
+  ];
+  ctx.strokeStyle = '#00c800'; ctx.lineWidth = 4;
+  for (const [a,b] of connections) {
+    ctx.beginPath(); ctx.moveTo(hand[a].x * 640, hand[a].y * 480);
+    ctx.lineTo(hand[b].x * 640, hand[b].y * 480); ctx.stroke();
+  }
+  hand.forEach((point,index) => {
+    ctx.fillStyle = index === 0 ? '#ff0000' : '#00ff00';
+    ctx.beginPath(); ctx.arc(point.x * 640, point.y * 480, 7, 0, Math.PI * 2); ctx.fill();
+  });
+}
 let lastVideoTime = -1;
 function frame(now) {
   try {
@@ -153,8 +169,7 @@ function frame(now) {
       features = hand ? extractFeatures(hand) : null;
       if (hand) {
         lastSeen = now;
-        ctx.fillStyle = '#62e6bc';
-        for (const p of hand) { ctx.beginPath(); ctx.arc(p.x * 640, p.y * 480, 4, 0, Math.PI * 2); ctx.fill(); }
+        drawHand(hand);
         if (stage === 'learn' && collecting && now - lastCollect > 250) { lesson.add(collecting, features); lastCollect = now; }
       }
     }
@@ -163,11 +178,17 @@ function frame(now) {
       const prediction = lesson.predict(features);
       $('prediction').textContent = names[prediction.label];
       $('prediction-note').textContent = `비슷한 샘플의 일치 비율 ${Math.round(prediction.agreement * 100)}% · 시험 정답률과 달라요.`;
-      if (driving && stage === 'robot' && now - lastCommand > 150) { lastCommand = now; send(prediction.label); }
+      if (driving && stage === 'robot') {
+        $('robot-status').textContent = '마퀸 조작 중 · 손을 보여주세요.';
+        if (now - lastCommand > 150) { lastCommand = now; send(prediction.label); }
+      }
     } else {
       $('prediction').textContent = stage === 'learn' ? '데이터 수집 중' : '손을 보여주세요';
       $('prediction-note').textContent = stage === 'learn' ? '모델 학습하기를 누르면 테스트할 수 있어요.' : '손이 보이면 AI의 예상을 확인할 수 있어요.';
-      if (driving) stopRobot('손이 보이지 않아 정지했어요. 손을 보여주고 다시 시작해주세요.');
+      if (driving && stage === 'robot') {
+        $('robot-status').textContent = '손 인식 대기 중 · 조작 모드는 유지돼요. 손을 보여주면 자동으로 이어집니다.';
+        if (now - lastCommand > 150) { lastCommand = now; send('stop'); }
+      }
     }
     refresh();
   } catch (error) {
