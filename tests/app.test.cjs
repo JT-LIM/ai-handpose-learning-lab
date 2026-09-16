@@ -31,26 +31,26 @@ function app() {
 test('student flow separates collection, training, testing and retraining', async () => {
   const { elements:e, run } = app();
   assert.equal(e['tab-test'].disabled,true); assert.equal(e.train.disabled,true);
-  run("Object.keys(names).forEach((label,index) => { for(let i=0;i<5;i++) lesson.add(label,[index*10,0]); }); refresh()");
+  run("Object.keys(names).forEach((label,index) => { for(let i=0;i<30;i++) lesson.add(label,[index*10,0]); }); refresh()");
   assert.equal(e.train.disabled,false); assert.equal(e['tab-test'].disabled,true);
   await e.train.onclick(); await Promise.resolve();
-  assert.equal(run('stage'),'test'); assert.equal(run('lesson.model.length'),25);
+  assert.equal(run('stage'),'test'); assert.equal(run('lesson.model.length'),150);
   assert.equal(e['tab-robot'].disabled,true);
   run('features=[20,0]; lastSeen=1000'); e.expected.value='left'; e.record.onclick();
-  assert.equal(e.accuracy.textContent,'100%'); assert.equal(run('lesson.samples.length'),25);
+  assert.equal(e.accuracy.textContent,'100%'); assert.equal(run('lesson.samples.length'),150);
   assert.equal(e['tab-robot'].disabled,true);
   await run("changeStage('robot')"); assert.equal(run('stage'),'test');
-  run("Object.keys(names).forEach((label,index)=>{ for(let i=0;i<2;i++) lesson.record(label,[index*10,0]); }); refresh()");
+  run("Object.keys(names).forEach((label,index)=>{ for(let i=0;i<5;i++) lesson.record(label,[index*10,0]); }); refresh()");
   assert.equal(e['tab-robot'].disabled,false);
   await e.improve.onclick();
   run("lesson.add('left',[20,0]); refresh()");
   assert.equal(e['tab-test'].disabled,true);
   await e.train.onclick(); await Promise.resolve();
-  assert.equal(e.accuracy.textContent,'—'); assert.equal(run('lesson.tests.length'),11); assert.equal(e['tab-robot'].disabled,true);
+  assert.equal(e.accuracy.textContent,'—'); assert.equal(run('lesson.tests.length'),26); assert.equal(e['tab-robot'].disabled,true);
 });
 test('robot only starts explicitly and stage transition sends stop while preserving connection', async () => {
   const { elements:e,run }=app();
-  run("Object.keys(names).forEach((label,index) => { for(let i=0;i<5;i++) lesson.add(label,[index*10,0]); }); lesson.train(); Object.keys(names).forEach((label,index)=>{for(let i=0;i<2;i++) lesson.record(label,[index*10,0]);}); features=[20,0]; lastSeen=1000; globalThis.commands=[]; characteristic={writeValue:async data=>commands.push(new TextDecoder().decode(data))}");
+  run("Object.keys(names).forEach((label,index) => { for(let i=0;i<30;i++) lesson.add(label,[index*10,0]); }); lesson.train(); Object.keys(names).forEach((label,index)=>{for(let i=0;i<5;i++) lesson.record(label,[index*10,0]);}); features=[20,0]; lastSeen=1000; globalThis.commands=[]; characteristic={writeValue:async data=>commands.push(new TextDecoder().decode(data))}");
   // Provide TextDecoder through a mock write that only inspects bytes.
   run("characteristic={writeValue:async data=>commands.push(String.fromCharCode(...data))}");
   await run("changeStage('robot')");
@@ -62,14 +62,14 @@ test('robot only starts explicitly and stage transition sends stop while preserv
 });
 test('stale camera frames cannot create test records',async()=>{
   const {elements:e,run}=app();
-  run("Object.keys(names).forEach((label,index)=>{for(let i=0;i<5;i++)lesson.add(label,[index*10,0]);}); lesson.train();");
+  run("Object.keys(names).forEach((label,index)=>{for(let i=0;i<30;i++)lesson.add(label,[index*10,0]);}); lesson.train();");
   await run("changeStage('test')"); e.expected.value='forward'; e.record.onclick();
   assert.equal(run('lesson.tests.length'),0);
 });
 
 test('missing hand preserves driving mode and resumes commands without another start', async () => {
   const {run}=app();
-  run("Object.keys(names).forEach((label,index)=>{for(let i=0;i<5;i++)lesson.add(label,[index*10,0]);}); lesson.train(); Object.keys(names).forEach((label,index)=>{for(let i=0;i<2;i++)lesson.record(label,[index*10,0]);}); stage='robot'; driving=true; features=null; globalThis.commands=[]; characteristic={writeValue:async data=>commands.push(String.fromCharCode(...data))}");
+  run("Object.keys(names).forEach((label,index)=>{for(let i=0;i<30;i++)lesson.add(label,[index*10,0]);}); lesson.train(); Object.keys(names).forEach((label,index)=>{for(let i=0;i<5;i++)lesson.record(label,[index*10,0]);}); stage='robot'; driving=true; features=null; globalThis.commands=[]; characteristic={writeValue:async data=>commands.push(String.fromCharCode(...data))}");
   run('frame(1000)'); await Promise.resolve(); await Promise.resolve();
   assert.equal(run('driving'),true); assert.equal(run('commands.at(-1)'),'stop\n');
   run('features=[20,0]; lastSeen=1000; frame(1200)'); await Promise.resolve(); await Promise.resolve();

@@ -13,9 +13,9 @@ function endCollection() {
   document.querySelectorAll('.collect').forEach(b => b.classList.remove('collecting'));
 }
 function refresh() {
-  for (const label in names) $('count-' + label).textContent = `${lesson.count(label)}개`;
+  for (const label in names) $('count-' + label).textContent = `${lesson.count(label)}/30개`;
   $('total').textContent = `${lesson.samples.length}개 수집`;
-  $('train').disabled = !Object.keys(names).every(label => lesson.count(label) >= 3) || !lesson.dirty;
+  $('train').disabled = !Object.keys(names).every(label => lesson.count(label) >= 30) || !lesson.dirty;
   $('tab-test').disabled = !ready();
   $('tab-robot').disabled = !lesson.canDrive();
   $('go-robot').disabled = !lesson.canDrive();
@@ -75,9 +75,10 @@ function renderGuidance() {
   const list = $('feedback-list'); list.replaceChildren();
   for (const note of notes) {
     const item = document.createElement('li');
-    if (note.type === 'few') item.textContent = `예시가 적은 동작: ${note.labels.map(label => `${names[label]} ${note.counts[label]}개`).join(', ')}. 손 각도를 바꾸거나 다른 친구의 손으로 예시를 더 모아보세요. 10개 미만은 수업용 참고 기준이며, 개수만으로 성능을 판단할 수 없어요.`;
+    if (note.type === 'few') item.textContent = `예시가 적은 동작: ${note.labels.map(label => `${names[label]} ${note.counts[label]}개`).join(', ')}. 손 각도를 바꾸거나 다른 친구의 손으로 예시를 더 모아보세요. 각 동작을 30개 이상 모아야 학습할 수 있어요. 개수만으로 성능을 보장하지는 않아요.`;
     if (note.type === 'imbalance') item.textContent = `동작별 데이터 차이가 커요 (${Object.entries(note.counts).map(([label,count]) => `${names[label]} ${count}개`).join(', ')}). 한 동작의 예시에 치우칠 수 있으니 적은 동작도 더 모아보세요.`;
-    if (note.type === 'testing') item.textContent = `아직 모든 동작을 충분히 확인하지 않았어요. 동작별 2회 조건을 채우려면 ${note.remaining}회 더 시험해야 해요. 테스트를 늘려도 모델이 학습되는 것은 아니에요.`;
+    if (note.type === 'testing') item.textContent = `아직 모든 동작을 충분히 확인하지 않았어요. 동작별 5회 조건을 채우려면 ${note.remaining}회 더 시험해야 해요. 테스트를 늘려도 모델이 학습되는 것은 아니에요.`;
+    if (note.type === 'accuracy') item.textContent = `정답률 80% 이하: ${note.labels.map(label => names[label]).join(', ')}. 이 동작들의 데이터와 정답을 점검하고 보완해 다시 학습해보세요. 모든 동작이 80%를 초과해야 마퀸 조작으로 넘어갈 수 있어요.`;
     if (note.type === 'confusion') item.textContent = `실제 ${names[note.expected]}를 AI가 ${names[note.predicted]}로 ${note.count}회 예상했어요. 두 손 모양이 비슷하거나 예시·정답이 충분하지 않을 수 있어요. 정답 이름을 확인하고, 서로 구분되는 다양한 예시를 모아 다시 학습해보세요.`;
     list.append(item);
   }
@@ -86,15 +87,15 @@ function renderGuidance() {
 }
 function renderTests() {
   const progress = lesson.testProgress();
-  $('test-progress').textContent = `마퀸 조작 준비 ${progress.completed}/10 · 실제 시험 ${progress.total}회`;
+  $('test-progress').textContent = `마퀸 조작 준비 ${progress.completed}/25 · 실제 시험 ${progress.total}회`;
   $('test-counts').replaceChildren();
   for (const label in names) {
     const item = document.createElement('span');
-    item.className = progress.counts[label] >= 2 ? 'pill' : 'pill pending';
-    item.textContent = `${names[label]} ${progress.counts[label]}/2회`;
+    item.className = progress.counts[label] >= 5 && progress.accuracy[label] > .8 ? 'pill' : 'pill pending';
+    item.textContent = `${names[label]} ${progress.counts[label]}/5회 · ${progress.counts[label] ? (progress.accuracy[label] * 100).toFixed(1) + "% (" + progress.correct[label] + "/" + progress.counts[label] + ")" : "정답률 —"}`;
     $('test-counts').append(item);
   }
-  $('unlock-status').textContent = lesson.canDrive() ? '다섯 동작을 모두 2번 이상 시험했어요. 정답률과 관계없이 마퀸 조작을 시작할 수 있어요.' : '실제 정답으로 선택한 동작별로 2회씩 시험해주세요. 한 동작만 여러 번 시험해도 열리지 않아요. 다시 학습하면 새 모델에서 10회 조건을 다시 확인해요.';
+  $('unlock-status').textContent = lesson.canDrive() ? '다섯 동작 모두 테스트 5회 이상, 정답률 80% 초과를 달성했어요. 마퀸 조작을 시작할 수 있어요.' : '각 동작을 5회 이상 시험하고, 모든 동작의 정답률이 80%를 초과해야 해요. 4/5회 정답(80%)은 통과하지 못해요. 현재 모델의 누적 시험으로 계산하며, 다시 학습하면 새 모델에서 다시 시험해요.';
   renderGuidance();
   const current = lesson.tests.filter(t => t.version === lesson.version);
   const correct = current.filter(t => t.correct).length;

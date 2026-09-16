@@ -9,28 +9,33 @@
     count(label) { return this.samples.filter(s => s.label === label).length; }
     remove(label) { this.samples = this.samples.filter(s => s.label !== label); this.dirty = true; }
     train() {
-      if (labels.some(label => this.count(label) < 3)) throw Error('다섯 동작을 각각 3개 이상 모아주세요.');
+      if (labels.some(label => this.count(label) < 30)) throw Error('다섯 동작을 각각 30개 이상 모아주세요.');
       this.model = this.samples.map(s => ({ label: s.label, features: [...s.features] }));
       this.version++; this.dirty = false;
     }
     testProgress() {
       const current = this.tests.filter(t => t.version === this.version);
       const counts = Object.fromEntries(labels.map(label => [label, current.filter(t => t.expected === label).length]));
-      return { counts, completed: labels.reduce((sum, label) => sum + Math.min(2, counts[label]), 0), total: current.length };
+      const correct = Object.fromEntries(labels.map(label => [label, current.filter(t => t.expected === label && t.correct).length]));
+      const accuracy = Object.fromEntries(labels.map(label => [label, counts[label] ? correct[label] / counts[label] : null]));
+      return { counts, correct, accuracy, completed: labels.reduce((sum, label) => sum + Math.min(5, counts[label]), 0), total: current.length };
     }
     canDrive() {
-      return this.model.length > 0 && !this.dirty && this.testProgress().completed === 10;
+      const progress = this.testProgress();
+      return this.model.length > 0 && !this.dirty && labels.every(label => progress.counts[label] >= 5 && progress.correct[label] * 5 > progress.counts[label] * 4);
     }
     feedback(useModel = false) {
       const source = useModel ? this.model : this.samples;
       const counts = Object.fromEntries(labels.map(label => [label, source.filter(s => s.label === label).length]));
       const notes = [];
-      const few = labels.filter(label => counts[label] < 10);
+      const few = labels.filter(label => counts[label] < 30);
       if (few.length) notes.push({ type: 'few', labels: few, counts });
       const min = Math.min(...Object.values(counts)), max = Math.max(...Object.values(counts));
       if (max > 0 && (min === 0 || max >= min * 3)) notes.push({ type: 'imbalance', counts });
       const progress = this.testProgress();
-      if (progress.completed < 10) notes.push({ type: 'testing', remaining: 10 - progress.completed });
+      if (progress.completed < 25) notes.push({ type: 'testing', remaining: 25 - progress.completed });
+      const weak = labels.filter(label => progress.counts[label] >= 5 && progress.correct[label] * 5 <= progress.counts[label] * 4);
+      if (weak.length) notes.push({ type: 'accuracy', labels: weak });
       const pairs = new Map();
       for (const t of this.tests.filter(t => t.version === this.version && !t.correct)) {
         const key = t.expected + ':' + t.predicted;
