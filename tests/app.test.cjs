@@ -67,9 +67,10 @@ test('stale camera frames cannot create test records',async()=>{
   assert.equal(run('lesson.tests.length'),0);
 });
 
-test('missing hand preserves driving mode and resumes commands without another start', async () => {
-  const {run}=app();
-  run("Object.keys(names).forEach((label,index)=>{for(let i=0;i<30;i++)lesson.add(label,[index*10,0]);}); lesson.train(); Object.keys(names).forEach((label,index)=>{for(let i=0;i<5;i++)lesson.record(label,[index*10,0]);}); stage='robot'; driving=true; features=null; globalThis.commands=[]; characteristic={writeValue:async data=>commands.push(String.fromCharCode(...data))}");
+test('start works without a hand and resumes commands when a hand appears', async () => {
+  const {elements:e,run}=app();
+  run("Object.keys(names).forEach((label,index)=>{for(let i=0;i<30;i++)lesson.add(label,[index*10,0]);}); lesson.train(); Object.keys(names).forEach((label,index)=>{for(let i=0;i<5;i++)lesson.record(label,[index*10,0]);}); stage='robot'; driving=false; features=null; globalThis.commands=[]; characteristic={writeValue:async data=>commands.push(String.fromCharCode(...data))}");
+  e['robot-start'].onclick(); assert.equal(run('driving'),true);
   run('frame(1000)'); await Promise.resolve(); await Promise.resolve();
   assert.equal(run('driving'),true); assert.equal(run('commands.at(-1)'),'stop\n');
   run('features=[20,0]; lastSeen=1000; frame(1200)'); await Promise.resolve(); await Promise.resolve();

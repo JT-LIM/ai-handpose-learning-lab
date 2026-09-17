@@ -246,8 +246,9 @@ $('connect').onclick = async () => {
 $('disconnect').onclick = async () => { await stopRobot(); device?.gatt.disconnect(); };
 $('robot-start').onclick = () => {
   if (stage !== 'robot' || !lesson.canDrive() || !characteristic || stopping) return;
-  if (!fresh()) { notify('손이 보이는 상태에서 시작해주세요.'); return; }
-  driving = true; $('robot-status').textContent = '마퀸 조작 중 · 손을 보여주세요.'; refresh();
+  driving = true;
+  $('robot-status').textContent = fresh() ? '마퀸 조작 중 · 손을 보여주세요.' : '조작 시작됨 · 손이 인식되면 자동으로 움직여요.';
+  refresh();
 };
 $('robot-stop').onclick = () => stopRobot();
 window.addEventListener('blur', () => { endCollection(); stopRobot('창을 벗어나 조작을 중지했어요.'); });
